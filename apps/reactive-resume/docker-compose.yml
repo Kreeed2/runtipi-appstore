@@ -1,0 +1,147 @@
+version: "3.8"
+services:
+  reactive-resume:
+    container_name: reactive-resume
+    image: amruthpillai/reactive-resume:v4.1.7
+    restart: unless-stopped
+    ports:
+      - ${APP_PORT}:3000
+    depends_on:
+      - postgres
+      - minio
+      - chrome
+    networks:
+      - tipi_main_network
+    environment:
+      # -- Environment Variables --
+      PORT: 3000
+      NODE_ENV: production
+
+      # -- URLs --
+      PUBLIC_URL: ${APP_PROTOCOL:-http}://${APP_DOMAIN}
+      STORAGE_URL: http://localhost:9000/default
+
+      # -- Printer (Chrome) --
+      CHROME_TOKEN: chrome_token
+      CHROME_URL: ws://chrome:3000
+
+      # -- Database (Postgres) --
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
+
+      # -- Auth --
+      ACCESS_TOKEN_SECRET: access_token_secret
+      REFRESH_TOKEN_SECRET: refresh_token_secret
+
+      # -- Emails --
+      MAIL_FROM: noreply@localhost
+      # SMTP_URL: smtp://user:pass@smtp:587 # Optional
+
+      # -- Storage (Minio) --
+      STORAGE_ENDPOINT: minio
+      STORAGE_PORT: 9000
+      STORAGE_REGION: us-east-1 # Optional
+      STORAGE_BUCKET: default
+      STORAGE_ACCESS_KEY: minioadmin
+      STORAGE_SECRET_KEY: minioadmin
+      STORAGE_USE_SSL: false
+      STORAGE_SKIP_BUCKET_CHECK: false
+
+      # -- Crowdin (Optional) --
+      # CROWDIN_PROJECT_ID:
+      # CROWDIN_PERSONAL_TOKEN:
+
+      # -- Email (Optional) --
+      # DISABLE_SIGNUPS: false
+      # DISABLE_EMAIL_AUTH: false
+
+      # -- GitHub (Optional) --
+      # GITHUB_CLIENT_ID: github_client_id
+      # GITHUB_CLIENT_SECRET: github_client_secret
+      # GITHUB_CALLBACK_URL: http://localhost:3000/api/auth/github/callback
+
+      # -- Google (Optional) --
+      # GOOGLE_CLIENT_ID: google_client_id
+      # GOOGLE_CLIENT_SECRET: google_client_secret
+      # GOOGLE_CALLBACK_URL: http://localhost:3000/api/auth/google/callback
+    labels:
+      # Main
+      traefik.enable: true
+      traefik.http.middlewares.reactive-resume-web-redirect.redirectscheme.scheme: https
+      traefik.http.services.reactive-resume.loadbalancer.server.port:
+        8000
+        # Web
+      traefik.http.routers.reactive-resume-insecure.rule: Host(`${APP_DOMAIN}`)
+      traefik.http.routers.reactive-resume-insecure.entrypoints: web
+      traefik.http.routers.reactive-resume-insecure.service: reactive-resume
+      traefik.http.routers.reactive-resume-insecure.middlewares:
+        reactive-resume-web-redirect
+        # Websecure
+      traefik.http.routers.reactive-resume.rule: Host(`${APP_DOMAIN}`)
+      traefik.http.routers.reactive-resume.entrypoints: websecure
+      traefik.http.routers.reactive-resume.service: reactive-resume
+      traefik.http.routers.reactive-resume.tls.certresolver:
+        myresolver
+        # Local domain
+      traefik.http.routers.reactive-resume-local-insecure.rule: Host(`reactive-resume.${LOCAL_DOMAIN}`)
+      traefik.http.routers.reactive-resume-local-insecure.entrypoints: web
+      traefik.http.routers.reactive-resume-local-insecure.service: reactive-resume
+      traefik.http.routers.reactive-resume-local-insecure.middlewares:
+        reactive-resume-web-redirect
+        # Local domain secure
+      traefik.http.routers.reactive-resume-local.rule: Host(`reactive-resume.${LOCAL_DOMAIN}`)
+      traefik.http.routers.reactive-resume-local.entrypoints: websecure
+      traefik.http.routers.reactive-resume-local.service: reactive-resume
+      traefik.http.routers.reactive-resume-local.tls: true
+      runtipi.managed: true
+
+  # Database (Postgres)
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - ${APP_DATA_DIR}/data/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tipi_main_network
+    labels:
+      runtipi.managed: true
+
+  # Storage (for image uploads)
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    command: server /data
+    # ports:
+    #   - "9000:9000"
+    volumes:
+      - ${APP_DATA_DIR}/data/minio:/data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    networks:
+      - tipi_main_network
+    labels:
+      runtipi.managed: true
+
+  # Chrome Browser (for printing and previews)
+  chrome:
+    image: ghcr.io/browserless/chromium:latest
+    restart: unless-stopped
+    environment:
+      TIMEOUT: 10000
+      CONCURRENT: 10
+      TOKEN: chrome_token
+      EXIT_ON_HEALTH_FAILURE: true
+      PRE_REQUEST_HEALTH_CHECK: true
+    networks:
+      - tipi_main_network
+    labels:
+      runtipi.managed: true

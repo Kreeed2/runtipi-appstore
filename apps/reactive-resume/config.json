@@ -1,0 +1,19 @@
+{
+    "$schema": "../schema.json",
+    "name": "Reactive Resume",
+    "available": true,
+    "exposable": true,
+    "port": 8354,
+    "id": "reactive-resume",
+    "tipi_version": 24,
+    "version": "v4.1.7",
+    "categories": ["utilities"],
+    "description": "",
+    "short_desc": "A free and open-source resume builder that simplifies the process of creating, updating, and sharing your resume.",
+    "author": "Amruth Pillai",
+    "source": "https://github.com/AmruthPillai/Reactive-Resume",
+    "form_fields": [],
+    "supported_architectures": ["amd64"],
+    "created_at": 1726146977676,
+    "updated_at": 1726146977676
+  }
